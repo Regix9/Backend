@@ -4,53 +4,50 @@ const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '';
 
-// CORS â€” sab sites ko allow karo
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
+app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization'] }));
 app.options('*', cors());
 app.use(express.json());
 
-// Health check
 app.get('/', (req, res) => {
-    res.json({ status: 'StreamVault Backend Running âœ…' });
+    res.json({ status: 'StreamVault Backend Running ✅' });
 });
 
-// Download route
 app.get('/download', async (req, res) => {
     const { url } = req.query;
-
-    if (!url) {
-        return res.status(400).json({ error: 'URL required' });
-    }
-
-    if (!RAPIDAPI_KEY) {
-        return res.status(500).json({ error: 'API key not configured on server' });
-    }
+    if (!url) return res.status(400).json({ error: 'URL required' });
+    if (!RAPIDAPI_KEY) return res.status(500).json({ error: 'API key not set' });
 
     try {
+        // API 1: All Video Downloader
         const response = await fetch(
-            `https://social-media-video-downloader.p.rapidapi.com/smvd/get/all?url=${encodeURIComponent(url)}`,
+            `https://all-video-downloader1.p.rapidapi.com/download?url=${encodeURIComponent(url)}`,
             {
                 method: 'GET',
                 headers: {
                     'X-RapidAPI-Key': RAPIDAPI_KEY,
-                    'X-RapidAPI-Host': 'social-media-video-downloader.p.rapidapi.com'
+                    'X-RapidAPI-Host': 'all-video-downloader1.p.rapidapi.com'
                 }
             }
         );
 
         if (!response.ok) {
-            const status = response.status;
-            if (status === 401 || status === 403) return res.status(403).json({ error: 'Invalid API key' });
-            if (status === 429) return res.status(429).json({ error: 'Monthly limit reached' });
-            return res.status(500).json({ error: 'RapidAPI error: ' + status });
+            // API 2: Fallback — Video Downloader API
+            const res2 = await fetch(
+                `https://video-downloader-api1.p.rapidapi.com/?url=${encodeURIComponent(url)}`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'X-RapidAPI-Key': RAPIDAPI_KEY,
+                        'X-RapidAPI-Host': 'video-downloader-api1.p.rapidapi.com'
+                    }
+                }
+            );
+
+            if (!res2.ok) return res.status(500).json({ error: 'Both APIs failed. Try another URL.' });
+            const data2 = await res2.json();
+            return res.json(data2);
         }
 
         const data = await response.json();
@@ -61,6 +58,4 @@ app.get('/download', async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`âœ… StreamVault backend running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`✅ StreamVault running on port ${PORT}`));
