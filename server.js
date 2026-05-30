@@ -5,23 +5,33 @@ const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ── Aapki RapidAPI Key yahan daalo ──
-const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || 'APNI_KEY_YAHAN_DAALO';
+const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '';
 
-app.use(cors());
+// CORS â€” sab sites ko allow karo
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+app.options('*', cors());
 app.use(express.json());
 
 // Health check
 app.get('/', (req, res) => {
-    res.json({ status: 'StreamVault Backend Running ✅' });
+    res.json({ status: 'StreamVault Backend Running âœ…' });
 });
 
-// ── Main Download Route ──
+// Download route
 app.get('/download', async (req, res) => {
     const { url } = req.query;
 
     if (!url) {
         return res.status(400).json({ error: 'URL required' });
+    }
+
+    if (!RAPIDAPI_KEY) {
+        return res.status(500).json({ error: 'API key not configured on server' });
     }
 
     try {
@@ -38,19 +48,19 @@ app.get('/download', async (req, res) => {
 
         if (!response.ok) {
             const status = response.status;
-            if (status === 401 || status === 403) return res.status(403).json({ error: 'API key invalid' });
+            if (status === 401 || status === 403) return res.status(403).json({ error: 'Invalid API key' });
             if (status === 429) return res.status(429).json({ error: 'Monthly limit reached' });
-            return res.status(500).json({ error: 'Server error: ' + status });
+            return res.status(500).json({ error: 'RapidAPI error: ' + status });
         }
 
         const data = await response.json();
         res.json(data);
 
     } catch (err) {
-        res.status(500).json({ error: 'Something went wrong: ' + err.message });
+        res.status(500).json({ error: 'Server error: ' + err.message });
     }
 });
 
 app.listen(PORT, () => {
-    console.log(`✅ StreamVault backend running on port ${PORT}`);
+    console.log(`âœ… StreamVault backend running on port ${PORT}`);
 });
