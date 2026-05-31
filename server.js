@@ -14,30 +14,6 @@ app.get('/', (req, res) => {
     res.json({ status: 'StreamVault Backend Running ✅' });
 });
 
-// ── Test route — MP4 API ka raw response dekhne ke liye ──
-app.get('/test-mp4', async (req, res) => {
-    const { id } = req.query;
-    if (!id) return res.json({ error: 'id required' });
-
-    try {
-        const r = await fetch(
-            `https://youtube-mp4-downloader.p.rapidapi.com/mp4?id=${id}`,
-            {
-                method: 'GET',
-                headers: {
-                    'x-rapidapi-key': RAPIDAPI_KEY,
-                    'x-rapidapi-host': 'youtube-mp4-downloader.p.rapidapi.com',
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
-        const text = await r.text();
-        res.json({ status: r.status, body: text });
-    } catch(e) {
-        res.json({ error: e.message });
-    }
-});
-
 app.get('/download', async (req, res) => {
     const { url } = req.query;
     if (!url) return res.status(400).json({ error: 'URL required' });
@@ -50,10 +26,11 @@ app.get('/download', async (req, res) => {
         const links = [];
         let title = 'Video';
 
-        // ── YouTube MP4 ──
+        // ── YouTube MP4 — full URL bhejo ──
         if (isYouTube && ytId) {
+            const ytUrl = `https://www.youtube.com/watch?v=${ytId}`;
             const mp4Res = await fetch(
-                `https://youtube-mp4-downloader.p.rapidapi.com/mp4?id=${ytId}`,
+                `https://youtube-mp4-downloader.p.rapidapi.com/mp4?url=${encodeURIComponent(ytUrl)}`,
                 {
                     method: 'GET',
                     headers: {
@@ -66,16 +43,17 @@ app.get('/download', async (req, res) => {
 
             if (mp4Res.ok) {
                 const d = await mp4Res.json();
-                console.log('MP4 API response:', JSON.stringify(d));
+                console.log('MP4 response:', JSON.stringify(d));
                 title = d.title || title;
-                // Try all possible response formats
-                if (d.url) links.push({ quality: '720p HD', url: d.url, extension: 'mp4' });
-                if (d.downloadUrl) links.push({ quality: '720p HD', url: d.downloadUrl, extension: 'mp4' });
-                if (d.link) links.push({ quality: '720p HD', url: d.link, extension: 'mp4' });
+
+                if (d.url)         links.push({ quality: '720p HD',  url: d.url,         extension: 'mp4' });
+                if (d.downloadUrl) links.push({ quality: '720p HD',  url: d.downloadUrl, extension: 'mp4' });
+                if (d.link)        links.push({ quality: '720p HD',  url: d.link,        extension: 'mp4' });
+
                 if (d.qualities && Array.isArray(d.qualities)) {
                     d.qualities.forEach(q => {
-                        const qUrl = q.url || q.link || q.downloadUrl;
-                        if (qUrl) links.push({ quality: q.quality || q.label || 'MP4', url: qUrl, extension: 'mp4' });
+                        const u = q.url || q.link || q.downloadUrl;
+                        if (u) links.push({ quality: q.quality || q.label || 'MP4', url: u, extension: 'mp4' });
                     });
                 }
                 if (d.formats && Array.isArray(d.formats)) {
@@ -110,7 +88,7 @@ app.get('/download', async (req, res) => {
             }
         }
 
-        // ── Other platforms ──
+        // ── Other platforms (Instagram, TikTok, Facebook etc) ──
         if (!isYouTube) {
             const uniRes = await fetch(
                 `https://social-download-all-in-one.p.rapidapi.com/v1/social/autolink`,
